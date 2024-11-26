@@ -25,11 +25,13 @@ export class AuthenticationController {
   @Post('forgot-password')
   forgotPassword(@Body() body: { email: string }) {
     return this.authenticationService.forgotPassword(body.email);
-  }   
-
-  @Post('reset-password')
-  resetPassword(@Body() resetPasswordDto: { token: string; password: string}) {
-    return this.authenticationService.resetPassword(resetPasswordDto.token, resetPasswordDto.password);
   }
 
+  @Post('reset-password')
+  resetPassword(@Body() resetPasswordDto: { token: string; password: string }) {
+    return this.authenticationService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.password,
+    );
+  }
 }

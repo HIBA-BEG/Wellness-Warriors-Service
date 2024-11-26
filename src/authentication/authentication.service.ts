@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateAuthenticationDto } from './dto/create-authentication.dto';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
@@ -12,18 +16,22 @@ export class AuthenticationService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
-    private mailerService: MailerService
-
-  ) { }
+    private mailerService: MailerService,
+  ) {}
 
   async register(createAuthDto: CreateAuthenticationDto): Promise<User> {
-    const existingUser = await this.userModel.findOne({ email: createAuthDto.email });
+    const existingUser = await this.userModel.findOne({
+      email: createAuthDto.email,
+    });
     if (existingUser) {
       throw new BadRequestException('User with this email already exists');
     }
 
     const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(createAuthDto.password, saltRounds);
+    const hashedPassword = await bcrypt.hash(
+      createAuthDto.password,
+      saltRounds,
+    );
 
     const createdUser = new this.userModel({
       email: createAuthDto.email,
@@ -51,7 +59,7 @@ export class AuthenticationService {
         id: user._id,
         firstName: user.firstName,
         lastName: user.lastName,
-        email: user.email
+        email: user.email,
       });
 
       return { token };
@@ -70,7 +78,8 @@ export class AuthenticationService {
 
       return { email: user.email };
     } catch (error) {
-      throw new UnauthorizedException('Token validation failed');
+      console.error('Verify token error:', error);
+      throw error;
     }
   }
 
@@ -83,11 +92,10 @@ export class AuthenticationService {
 
       const resetToken = this.jwtService.sign(
         { id: user._id, email: user.email },
-        { secret: process.env.JWT_SECRET, expiresIn: '1h' }
+        { secret: process.env.JWT_SECRET, expiresIn: '1h' },
       );
 
       const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
-
 
       try {
         await this.mailerService.sendMail({
@@ -114,9 +122,14 @@ export class AuthenticationService {
     }
   }
 
-  async resetPassword(resetToken: string, newPassword: string): Promise<{ message: string }> {
+  async resetPassword(
+    resetToken: string,
+    newPassword: string,
+  ): Promise<{ message: string }> {
     try {
-      const decoded = this.jwtService.verify(resetToken, { secret: process.env.JWT_SECRET });
+      const decoded = this.jwtService.verify(resetToken, {
+        secret: process.env.JWT_SECRET,
+      });
       const user = await this.userModel.findById(decoded.id);
 
       if (!user) {
@@ -129,8 +142,8 @@ export class AuthenticationService {
 
       return { message: 'Password has been successfully reset' };
     } catch (error) {
-      throw new BadRequestException('Invalid or expired reset token');
+      console.error('Reset password error:', error);
+      throw error;
     }
   }
-
 }
