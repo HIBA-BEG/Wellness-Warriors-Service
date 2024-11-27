@@ -10,7 +10,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-    
+
     ConfigModule.forRoot(),
     JwtModule.registerAsync({
       imports: [ConfigModule],

@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Get, Headers } from '@nestjs/common';
 import { AuthenticationService } from './authentication.service';
 import { CreateAuthenticationDto } from './dto/create-authentication.dto';
+import { LoginAuthenticationDto } from './dto/login-authentication.dto';
 
 @Controller('auth')
 export class AuthenticationController {
@@ -12,8 +13,8 @@ export class AuthenticationController {
   }
 
   @Post('login')
-  login(@Body() loginDto: { email: string; password: string }) {
-    return this.authenticationService.login(loginDto.email, loginDto.password);
+  login(@Body() loginAuthDto: LoginAuthenticationDto) {
+    return this.authenticationService.login(loginAuthDto);
   }
 
   @Get('verify')
@@ -25,11 +26,13 @@ export class AuthenticationController {
   @Post('forgot-password')
   forgotPassword(@Body() body: { email: string }) {
     return this.authenticationService.forgotPassword(body.email);
-  }   
-
-  @Post('reset-password')
-  resetPassword(@Body() resetPasswordDto: { token: string; password: string}) {
-    return this.authenticationService.resetPassword(resetPasswordDto.token, resetPasswordDto.password);
   }
 
+  @Post('reset-password')
+  resetPassword(@Body() resetPasswordDto: { token: string; password: string }) {
+    return this.authenticationService.resetPassword(
+      resetPasswordDto.token,
+      resetPasswordDto.password,
+    );
+  }
 }
