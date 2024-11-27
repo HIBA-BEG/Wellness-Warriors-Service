@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException} from '@nestjs/common';
 import { CreateAuthenticationDto } from './dto/create-authentication.dto';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
@@ -10,6 +6,8 @@ import { Model } from 'mongoose';
 import { User } from '../user/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 import { MailerService } from '@nestjs-modules/mailer';
+import { LoginAuthenticationDto } from './dto/login-authentication.dto';
+
 
 @Injectable()
 export class AuthenticationService {
@@ -19,46 +17,44 @@ export class AuthenticationService {
     private mailerService: MailerService,
   ) {}
 
-  async register(createAuthDto: CreateAuthenticationDto): Promise<User> {
+  async register(createAuthDto: CreateAuthenticationDto): Promise<{ token: string }> {
     const existingUser = await this.userModel.findOne({
       email: createAuthDto.email,
     });
+
     if (existingUser) {
       throw new BadRequestException('User with this email already exists');
     }
 
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(
-      createAuthDto.password,
-      saltRounds,
-    );
+    const hashedPassword = await bcrypt.hash(createAuthDto.password, 10);
 
-    const createdUser = new this.userModel({
-      email: createAuthDto.email,
+    const user = await this.userModel.create({
+      ...createAuthDto,
       password: hashedPassword,
-      firstName: createAuthDto.firstName,
-      lastName: createAuthDto.lastName,
+    });
+    
+    const token = this.jwtService.sign({
+      id: user._id,
+      email: user.email,
     });
 
-    return createdUser.save();
+    return { token };
   }
 
-  async login(email: string, password: string): Promise<{ token: string }> {
+  async login(loginAuthDto: LoginAuthenticationDto): Promise<{ token: string }> {
     try {
-      const user = await this.userModel.findOne({ email });
+      const user = await this.userModel.findOne({ email : loginAuthDto.email});
       if (!user) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      const isPasswordValid = await bcrypt.compare(password, user.password);
+      const isPasswordValid = await bcrypt.compare(loginAuthDto.password, user.password);
       if (!isPasswordValid) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
       const token = this.jwtService.sign({
         id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
         email: user.email,
       });
 

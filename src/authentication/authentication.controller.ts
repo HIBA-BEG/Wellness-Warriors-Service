@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Get, Headers } from '@nestjs/common';
 import { AuthenticationService } from './authentication.service';
 import { CreateAuthenticationDto } from './dto/create-authentication.dto';
+import { LoginAuthenticationDto } from './dto/login-authentication.dto';
 
 @Controller('auth')
 export class AuthenticationController {
@@ -12,8 +13,8 @@ export class AuthenticationController {
   }
 
   @Post('login')
-  login(@Body() loginDto: { email: string; password: string }) {
-    return this.authenticationService.login(loginDto.email, loginDto.password);
+  login(@Body() loginAuthDto: LoginAuthenticationDto) {
+    return this.authenticationService.login(loginAuthDto);
   }
 
   @Get('verify')
