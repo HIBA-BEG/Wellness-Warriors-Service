@@ -75,8 +75,8 @@ describe('AuthenticationService', () => {
 
       expect(result).toHaveProperty('token');
       expect(result.token).toBe('mock_token');
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ 
-        email: createAuthDto.email 
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({
+        email: createAuthDto.email,
       });
       expect(mockUserModel.create).toHaveBeenCalledWith({
         ...createAuthDto,
@@ -117,8 +117,8 @@ describe('AuthenticationService', () => {
 
       expect(result).toHaveProperty('token');
       expect(result.token).toBe('mock_token');
-      expect(mockUserModel.findOne).toHaveBeenCalledWith({ 
-        email: loginAuthDto.email 
+      expect(mockUserModel.findOne).toHaveBeenCalledWith({
+        email: loginAuthDto.email,
       });
       expect(mockJwtService.sign).toHaveBeenCalledWith({
         id: mockUser._id,

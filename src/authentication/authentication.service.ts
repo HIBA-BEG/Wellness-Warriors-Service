@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException} from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateAuthenticationDto } from './dto/create-authentication.dto';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
@@ -8,7 +12,6 @@ import * as bcrypt from 'bcrypt';
 import { MailerService } from '@nestjs-modules/mailer';
 import { LoginAuthenticationDto } from './dto/login-authentication.dto';
 
-
 @Injectable()
 export class AuthenticationService {
   constructor(
@@ -17,7 +20,9 @@ export class AuthenticationService {
     private mailerService: MailerService,
   ) {}
 
-  async register(createAuthDto: CreateAuthenticationDto): Promise<{ token: string }> {
+  async register(
+    createAuthDto: CreateAuthenticationDto,
+  ): Promise<{ token: string }> {
     const existingUser = await this.userModel.findOne({
       email: createAuthDto.email,
     });
@@ -32,7 +37,7 @@ export class AuthenticationService {
       ...createAuthDto,
       password: hashedPassword,
     });
-    
+
     const token = this.jwtService.sign({
       id: user._id,
       email: user.email,
@@ -41,14 +46,19 @@ export class AuthenticationService {
     return { token };
   }
 
-  async login(loginAuthDto: LoginAuthenticationDto): Promise<{ token: string }> {
+  async login(
+    loginAuthDto: LoginAuthenticationDto,
+  ): Promise<{ token: string }> {
     try {
-      const user = await this.userModel.findOne({ email : loginAuthDto.email});
+      const user = await this.userModel.findOne({ email: loginAuthDto.email });
       if (!user) {
         throw new UnauthorizedException('Invalid credentials');
       }
 
-      const isPasswordValid = await bcrypt.compare(loginAuthDto.password, user.password);
+      const isPasswordValid = await bcrypt.compare(
+        loginAuthDto.password,
+        user.password,
+      );
       if (!isPasswordValid) {
         throw new UnauthorizedException('Invalid credentials');
       }

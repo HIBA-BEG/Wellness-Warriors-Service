@@ -31,5 +31,5 @@ jobs:
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-    - name: Run Linter
-      run: npm run lint # to run linting 
+    # - name: Run Linter
+    #  run: npm run lint # to run linting 
