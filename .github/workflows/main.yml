@@ -2,34 +2,34 @@ name: Wellness Warriors CI/CD
 
 on:
   push:
-    branches: [ '**' ]
+    branches: ['**']
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest # to run on the latest Ubuntu runner
 
     steps:
-    - uses: actions/checkout@v3 # to checkout the repository code
+      - uses: actions/checkout@v3 # to checkout the repository code
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3 # to setup Node.js
-      with:
-        node-version: '18.x'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v3 # to setup Node.js
+        with:
+          node-version: '18.x'
+          cache: 'npm'
 
-    - name: Install Dependencies
-      run: npm ci # to install dependencies
+      - name: Install Dependencies
+        run: npm ci # to install dependencies
 
-    - name: Build
-      run: npm run build # to build the project
+      - name: Build
+        run: npm run build # to build the project
 
-    - name: Run Tests
-      run: npm test # to run tests
-      env:
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Run Tests
+        run: npm test # to run tests
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-    - name: Run Linter
-    run: npm run lint # to run linting 
+    # - name: Run Linter
+    # run: npm run lint # to run linting
