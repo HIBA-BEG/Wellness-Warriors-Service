@@ -34,11 +34,11 @@ export class UserService {
     return user;
   }
 
-  async remove(id: string): Promise<User> {
+  async remove(id: string): Promise<{ message: string }> {
     const user = await this.userModel.findByIdAndDelete(id);
     if (!user) {
       throw new HttpException('User not Found', HttpStatus.NOT_FOUND);
     }
-    return user;
+    return { message: 'User deleted successfully' };
   }
 }

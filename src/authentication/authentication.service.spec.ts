@@ -6,12 +6,9 @@ import { User } from '../user/entities/user.entity';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import * as bcrypt from 'bcrypt';
-import { Model } from 'mongoose';
 
 describe('AuthenticationService', () => {
   let service: AuthenticationService;
-  let userModel: Model<User>;
-  let jwtService: JwtService;
 
   const mockUserModel = {
     findOne: jest.fn(),
@@ -27,6 +24,8 @@ describe('AuthenticationService', () => {
   };
 
   beforeEach(async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthenticationService,
@@ -46,10 +45,12 @@ describe('AuthenticationService', () => {
     }).compile();
 
     service = module.get<AuthenticationService>(AuthenticationService);
-    userModel = module.get<Model<User>>(getModelToken(User.name));
-    jwtService = module.get<JwtService>(JwtService);
 
     jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('register', () => {

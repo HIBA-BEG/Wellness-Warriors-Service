@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum UserRole {
   ORGANIZER = 'organizer',
@@ -25,6 +25,12 @@ export class User extends Document {
 
   @Prop({ default: false })
   isBanned: boolean;
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Event' }] })
+  attendingEvents: Types.ObjectId[];
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'Event' }] })
+  createdEvents: Types.ObjectId[];
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
