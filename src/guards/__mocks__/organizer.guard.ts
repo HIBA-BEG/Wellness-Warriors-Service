@@ -1,8 +1,8 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate } from '@nestjs/common';
 
 @Injectable()
 export class OrganizerGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  canActivate(): boolean {
     return true;
   }
 }

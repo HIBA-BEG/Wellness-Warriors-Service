@@ -6,37 +6,43 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { OrganizerGuard } from 'src/guards/organizer.guard';
 
 @Controller('event')
+@UseGuards(OrganizerGuard)
 export class EventController {
   constructor(private readonly eventService: EventService) {}
 
   @Post()
-  create(@Body() createEventDto: CreateEventDto) {
-    return this.eventService.create(createEventDto);
+  async create(@Body() createEventDto: CreateEventDto) {
+    return await this.eventService.create(createEventDto);
   }
 
   @Get()
-  findAll() {
-    return this.eventService.findAll();
+  async findAll() {
+    return await this.eventService.findAll();
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.eventService.findOne(+id);
+  async findOne(@Param('id') id: string) {
+    return await this.eventService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateEventDto: UpdateEventDto) {
-    return this.eventService.update(+id, updateEventDto);
+  async update(
+    @Param('id') id: string,
+    @Body() updateEventDto: UpdateEventDto,
+  ) {
+    return await this.eventService.update(id, updateEventDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.eventService.remove(+id);
+  async remove(@Param('id') id: string) {
+    return await this.eventService.remove(id);
   }
 }

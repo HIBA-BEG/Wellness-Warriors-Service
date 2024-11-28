@@ -2,12 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { UserService } from './user.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from './entities/user.entity';
-import { Model } from 'mongoose';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 describe('UserService', () => {
   let service: UserService;
-  let userModel: Model<User>;
 
   const mockUserModel = {
     find: jest.fn(),
@@ -30,32 +28,8 @@ describe('UserService', () => {
     }).compile();
 
     service = module.get<UserService>(UserService);
-    userModel = module.get<Model<User>>(getModelToken(User.name));
     jest.clearAllMocks();
   });
-
-  // describe('create', () => {
-  //   it('should create a new user', async () => {
-  //     const createUserDto: CreateUserDto = {
-  //       email: 'test@test.com',
-  //       password: 'password123',
-  //       firstName: 'Test',
-  //       lastName: 'User',
-  //     };
-
-  //     const expectedUser = {
-  //       _id: 'someId',
-  //       ...createUserDto,
-  //     };
-
-  //     mockUserModel.create.mockResolvedValue(expectedUser);
-
-  //     const result = await service.create(createUserDto);
-
-  //     expect(result).toEqual(expectedUser);
-  //     expect(mockUserModel.create).toHaveBeenCalledWith(createUserDto);
-  //   });
-  // });
 
   describe('findAll', () => {
     it('should return an array of users', async () => {
@@ -119,6 +93,7 @@ describe('UserService', () => {
   describe('remove', () => {
     it('should delete a user', async () => {
       const userId = '1';
+      const expectedResult = { message: 'User deleted successfully' };
       const expectedUser = {
         _id: userId,
         email: 'test@test.com',
@@ -128,7 +103,7 @@ describe('UserService', () => {
 
       const result = await service.remove(userId);
 
-      expect(result).toEqual(expectedUser);
+      expect(result).toEqual(expectedResult);
       expect(mockUserModel.findByIdAndDelete).toHaveBeenCalledWith(userId);
     });
   });
