@@ -5,7 +5,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../user/entities/user.entity';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 describe('AuthenticationService', () => {
   let service: AuthenticationService;

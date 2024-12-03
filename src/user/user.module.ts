@@ -22,5 +22,6 @@ import { OrganizerGuard } from 'src/guards/organizer.guard';
   ],
   controllers: [UserController],
   providers: [UserService, OrganizerGuard],
+  exports: [MongooseModule, JwtModule, OrganizerGuard],
 })
 export class UserModule {}

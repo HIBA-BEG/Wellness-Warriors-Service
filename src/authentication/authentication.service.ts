@@ -8,7 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../user/entities/user.entity';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { MailerService } from '@nestjs-modules/mailer';
 import { LoginAuthenticationDto } from './dto/login-authentication.dto';
 
@@ -18,7 +18,7 @@ export class AuthenticationService {
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
     private mailerService: MailerService,
-  ) {}
+  ) { }
 
   async register(
     createAuthDto: CreateAuthenticationDto,
@@ -41,6 +41,7 @@ export class AuthenticationService {
     const token = this.jwtService.sign({
       id: user._id,
       email: user.email,
+      role: user.role,
     });
 
     return { token };
@@ -78,11 +79,16 @@ export class AuthenticationService {
   async verifyToken(token: string) {
     try {
       const decoded = this.jwtService.verify(token);
-      const user = await this.userModel.findOne({ email: decoded.email });
+      const user = await this.userModel.findOne({ email: decoded.email })
+        .select('-password');
 
       if (!user) throw new UnauthorizedException('User not found');
 
-      return { email: user.email };
+      return {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName
+      };
     } catch (error) {
       console.error('Verify token error:', error);
       throw error;
