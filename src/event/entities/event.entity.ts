@@ -28,6 +28,9 @@ export class Event extends Document {
   @Prop()
   poster: string;
 
+  @Prop({ default: false })
+  isDeleted: boolean;
+
   @Prop({ type: String, enum: EventStatus, default: EventStatus.SCHEDULED })
   status: EventStatus;
 

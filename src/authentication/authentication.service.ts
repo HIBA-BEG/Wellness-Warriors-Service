@@ -18,7 +18,7 @@ export class AuthenticationService {
     @InjectModel(User.name) private userModel: Model<User>,
     private jwtService: JwtService,
     private mailerService: MailerService,
-  ) { }
+  ) {}
 
   async register(
     createAuthDto: CreateAuthenticationDto,
@@ -79,15 +79,17 @@ export class AuthenticationService {
   async verifyToken(token: string) {
     try {
       const decoded = this.jwtService.verify(token);
-      const user = await this.userModel.findOne({ email: decoded.email })
+      const user = await this.userModel
+        .findOne({ email: decoded.email })
         .select('-password');
 
       if (!user) throw new UnauthorizedException('User not found');
 
       return {
+        _id: user._id,
         email: user.email,
         firstName: user.firstName,
-        lastName: user.lastName
+        lastName: user.lastName,
       };
     } catch (error) {
       console.error('Verify token error:', error);
