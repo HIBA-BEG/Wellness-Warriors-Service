@@ -3,7 +3,7 @@
 ## 📋 Project Overview
 Backend service for sports event registration management, providing robust API endpoints for event and participant management.
 
-##🚀 Features
+## 🚀 Features
 
 - Event CRUD operations
 - Participant registration management
