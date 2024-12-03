@@ -34,6 +34,19 @@ describe('EventService', () => {
     status: EventStatus.SCHEDULED,
   };
 
+  const mockUserModel = {
+    findById: jest.fn().mockImplementation(() => ({
+      exec: jest.fn().mockResolvedValue({
+        _id: new Types.ObjectId(),
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+      }),
+    })),
+    findByIdAndUpdate: jest.fn().mockResolvedValue({}),
+    updateMany: jest.fn().mockResolvedValue({}),
+  };
+
   const mockQuery = {
     populate: jest.fn().mockReturnThis(),
     exec: jest.fn().mockResolvedValue(mockEvent),
@@ -56,7 +69,7 @@ describe('EventService', () => {
         },
         {
           provide: getModelToken(User.name),
-          useValue: {},
+          useValue: mockUserModel,
         },
       ],
     }).compile();
@@ -129,13 +142,14 @@ describe('EventService', () => {
 
   describe('remove', () => {
     it('should successfully delete an event', async () => {
-      mockQuery.exec.mockResolvedValueOnce({ deletedCount: 1 });
+      mockQuery.exec.mockResolvedValueOnce({ isDeleted: true });
 
       const result = await service.remove(mockEvent._id.toString());
       expect(result.message).toBe('Event deleted successfully');
-      expect(mockEventModel.deleteOne).toHaveBeenCalledWith({
-        _id: mockEvent._id.toString(),
-      });
+      expect(mockEventModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        mockEvent._id.toString(),
+        { isDeleted: true },
+      );
     });
   });
 });

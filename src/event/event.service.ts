@@ -15,12 +15,23 @@ export class EventService {
 
   async create(createEventDto: CreateEventDto): Promise<Event> {
     const createdEvent = new this.eventModel(createEventDto);
-    return createdEvent.save();
+    const event = await createdEvent.save();
+
+    await this.userModel.findByIdAndUpdate(event.organizer, {
+      $push: { createdEvents: event._id },
+    });
+
+    await this.userModel.updateMany(
+      { _id: { $in: event.participants } },
+      { $push: { attendingEvents: event._id } },
+    );
+
+    return event;
   }
 
   async findAll(): Promise<Event[]> {
     return this.eventModel
-      .find()
+      .find({ isDeleted: false })
       .populate('organizer')
       .populate('participants')
       .exec();
@@ -49,11 +60,28 @@ export class EventService {
     if (!updatedEvent) {
       throw new NotFoundException(`Event not found`);
     }
+
+    await this.userModel.findByIdAndUpdate(updatedEvent.organizer, {
+      $addToSet: { createdEvents: updatedEvent._id },
+    });
+
+    await this.userModel.updateMany(
+      { attendingEvents: updatedEvent._id },
+      { $pull: { attendingEvents: updatedEvent._id } },
+    );
+
+    await this.userModel.updateMany(
+      { _id: { $in: updatedEvent.participants } },
+      { $addToSet: { attendingEvents: updatedEvent._id } },
+    );
+
     return updatedEvent;
   }
 
   async remove(id: string): Promise<{ message: string }> {
-    const result = await this.eventModel.deleteOne({ _id: id }).exec();
+    const result = await this.eventModel
+      .findByIdAndUpdate(id, { isDeleted: true })
+      .exec();
     if (!result) {
       throw new NotFoundException(`Event not found`);
     }
