@@ -59,6 +59,7 @@ describe('AuthenticationService', () => {
       password: 'password123',
       firstName: 'Test',
       lastName: 'User',
+      role: 'organizer',
     };
 
     it('should successfully register a new user', async () => {
@@ -86,6 +87,7 @@ describe('AuthenticationService', () => {
       expect(mockJwtService.sign).toHaveBeenCalledWith({
         id: savedUser._id,
         email: savedUser.email,
+        role: savedUser.role,
       });
     });
 
