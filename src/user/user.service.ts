@@ -9,7 +9,7 @@ export class UserService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
   async findAll(): Promise<User[]> {
-    const users = await this.userModel.find();
+    const users = await this.userModel.find({ role: 'participant' });
     if (!users) {
       throw new HttpException('No Users Found', HttpStatus.NOT_FOUND);
     }

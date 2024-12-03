@@ -5,7 +5,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { User } from '../user/entities/user.entity';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 describe('AuthenticationService', () => {
   let service: AuthenticationService;
@@ -59,6 +59,7 @@ describe('AuthenticationService', () => {
       password: 'password123',
       firstName: 'Test',
       lastName: 'User',
+      role: 'organizer',
     };
 
     it('should successfully register a new user', async () => {
@@ -86,6 +87,7 @@ describe('AuthenticationService', () => {
       expect(mockJwtService.sign).toHaveBeenCalledWith({
         id: savedUser._id,
         email: savedUser.email,
+        role: savedUser.role,
       });
     });
 

@@ -8,6 +8,14 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter(),
   );
-  await app.listen(process.env.PORT ?? 3000);
+
+  app.enableCors({
+    // origin: [process.env.CLIENT_URL, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  });
+
+  await app.listen(process.env.PORT ?? 3000, '0.0.0.0');
 }
 bootstrap();
