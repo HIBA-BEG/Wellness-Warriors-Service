@@ -99,5 +99,6 @@ docker-compose up
 
 ## 📞 Contact
 
-[BEGHDI HIBA]
-[beghiba@gmail.com]
+- BEGHDI HIBA
+- beghiba@gmail.com
+- Client Link (Front-end) : https://github.com/HIBA-BEG/Wellness-Warriors-Client.git
