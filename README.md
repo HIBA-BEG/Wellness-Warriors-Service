@@ -1,5 +1,8 @@
 # 🏅 Wellness Warriors - Service
 
+## 👩🏻‍💻 Project Presentation
+[Wellness Warriors Presentation HERE](https://www.canva.com/design/DAGX5mRxzho/EUheX8EtAlBNKnvmSsvz7Q/edit?utm_content=DAGX5mRxzho&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+
 ## 📋 Project Overview
 Backend service for sports event registration management, providing robust API endpoints for event and participant management.
 
