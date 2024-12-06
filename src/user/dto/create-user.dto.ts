@@ -31,4 +31,8 @@ export class CreateUserDto {
   @IsString()
   @IsNotEmpty()
   role: string;
+
+  @IsString()
+  @IsNotEmpty()
+  gender: string;
 }

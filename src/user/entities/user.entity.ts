@@ -6,6 +6,10 @@ export enum UserRole {
   PARTICIPANT = 'participant',
 }
 
+export enum UserGender {
+  Man = 'man',
+  Woman = 'woman',
+}
 @Schema({ timestamps: true })
 export class User extends Document {
   @Prop({ required: true })
@@ -25,6 +29,9 @@ export class User extends Document {
 
   @Prop({ default: false })
   isBanned: boolean;
+
+  @Prop({ type: String, enum: UserGender })
+  gender: UserGender;
 
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Event' }] })
   attendingEvents: Types.ObjectId[];
