@@ -32,7 +32,7 @@ export class CreateEventDto {
 
   @IsString()
   @IsOptional()
-  poster: string;
+  poster?: string;
 
   @IsString()
   @IsOptional()

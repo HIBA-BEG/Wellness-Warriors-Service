@@ -60,6 +60,7 @@ describe('AuthenticationService', () => {
       firstName: 'Test',
       lastName: 'User',
       role: 'organizer',
+      gender: 'woman',
     };
 
     it('should successfully register a new user', async () => {
