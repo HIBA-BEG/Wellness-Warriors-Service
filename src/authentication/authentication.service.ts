@@ -11,6 +11,10 @@ import { User } from '../user/entities/user.entity';
 import * as bcrypt from 'bcryptjs';
 import { MailerService } from '@nestjs-modules/mailer';
 import { LoginAuthenticationDto } from './dto/login-authentication.dto';
+import { join, extname } from 'path';
+import { mkdir, writeFile } from 'fs/promises';
+import { v4 as uuidv4 } from 'uuid';
+import { FileUpload } from '../types/file-upload.interface';
 
 @Injectable()
 export class AuthenticationService {
@@ -22,29 +26,71 @@ export class AuthenticationService {
 
   async register(
     createAuthDto: CreateAuthenticationDto,
+    file: FileUpload,
   ): Promise<{ token: string }> {
-    const existingUser = await this.userModel.findOne({
-      email: createAuthDto.email,
-    });
+    try {
+      if (!file.buffer || file.buffer.length === 0) {
+        throw new Error('Invalid file buffer');
+      }
 
-    if (existingUser) {
-      throw new BadRequestException('User with this email already exists');
+      const imageUrl = await this.uploadUserImage(file);
+
+      const existingUser = await this.userModel.findOne({
+        email: createAuthDto.email,
+      });
+
+      if (existingUser) {
+        throw new BadRequestException('User with this email already exists');
+      }
+
+      const hashedPassword = await bcrypt.hash(createAuthDto.password, 10);
+
+      const user = await this.userModel.create({
+        ...createAuthDto,
+        password: hashedPassword,
+        profilePicture: imageUrl,
+      });
+
+      const token = this.jwtService.sign({
+        id: user._id,
+        email: user.email,
+        role: user.role,
+      });
+
+      return { token };
+    } catch (error) {
+      console.error('Register error:', error);
+      throw error;
     }
+  }
 
-    const hashedPassword = await bcrypt.hash(createAuthDto.password, 10);
+  async uploadUserImage(file: FileUpload): Promise<string> {
+    try {
+      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
+      if (!allowedMimeTypes.includes(file.mimetype)) {
+        throw new BadRequestException(
+          'Invalid file type. Only JPEG, PNG, and GIF are allowed.',
+        );
+      }
 
-    const user = await this.userModel.create({
-      ...createAuthDto,
-      password: hashedPassword,
-    });
+      const uploadDir = join(process.cwd(), 'uploads-profile');
+      try {
+        await mkdir(uploadDir, { recursive: true });
+      } catch (err) {
+        if (err.code !== 'EEXIST') throw err;
+      }
 
-    const token = this.jwtService.sign({
-      id: user._id,
-      email: user.email,
-      role: user.role,
-    });
+      const fileExt = extname(file.originalname || '.jpg');
+      const fileName = `${uuidv4()}${fileExt}`;
+      const filePath = join(uploadDir, fileName);
 
-    return { token };
+      await writeFile(filePath, file.buffer);
+      console.log('Service: File written successfully:', filePath);
+      const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+      return `${serverUrl}/uploads-profile/${fileName}`;
+    } catch (error) {
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
   }
 
   async login(

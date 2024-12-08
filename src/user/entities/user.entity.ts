@@ -30,6 +30,9 @@ export class User extends Document {
   @Prop({ default: false })
   isBanned: boolean;
 
+  @Prop({ default: null })
+  profilePicture: string;
+
   @Prop({ type: String, enum: UserGender })
   gender: UserGender;
 

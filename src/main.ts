@@ -27,9 +27,14 @@ async function bootstrap() {
     decorateReply: false,
   });
 
+  await app.register(fastifyStatic as any, {
+    root: join(__dirname, '..', 'uploads-profile'),
+    prefix: '/uploads-profile/',
+    decorateReply: false,
+  });
+
   app.enableCors({
     origin: [process.env.CLIENT_URL, 'http://localhost:3000'],
-    // origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });

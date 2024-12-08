@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsNotEmpty,
+  IsOptional,
   IsString,
   MaxLength,
   MinLength,
@@ -16,6 +17,10 @@ export class CreateUserDto {
   @IsNotEmpty()
   @MinLength(3)
   lastName: string;
+
+  @IsString()
+  @IsOptional()
+  profilePicture?: string;
 
   @IsString()
   @IsNotEmpty()
