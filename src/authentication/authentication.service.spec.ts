@@ -6,6 +6,7 @@ import { User } from '../user/entities/user.entity';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import * as bcrypt from 'bcryptjs';
+import { FileUpload } from '../types/file-upload.interface';
 
 describe('AuthenticationService', () => {
   let service: AuthenticationService;
@@ -21,6 +22,12 @@ describe('AuthenticationService', () => {
 
   const mockMailerService = {
     sendMail: jest.fn(),
+  };
+
+  const mockFile: FileUpload = {
+    buffer: Buffer.from('mock image data'),
+    originalname: 'test.jpg',
+    mimetype: 'image/jpeg',
   };
 
   beforeEach(async () => {
@@ -74,7 +81,7 @@ describe('AuthenticationService', () => {
       mockUserModel.create.mockResolvedValue(savedUser);
       mockJwtService.sign.mockReturnValue('mock_token');
 
-      const result = await service.register(createAuthDto);
+      const result = await service.register(createAuthDto, mockFile);
 
       expect(result).toHaveProperty('token');
       expect(result.token).toBe('mock_token');
@@ -84,6 +91,7 @@ describe('AuthenticationService', () => {
       expect(mockUserModel.create).toHaveBeenCalledWith({
         ...createAuthDto,
         password: expect.any(String),
+        profilePicture: expect.any(String),
       });
       expect(mockJwtService.sign).toHaveBeenCalledWith({
         id: savedUser._id,
@@ -95,7 +103,7 @@ describe('AuthenticationService', () => {
     it('should throw BadRequestException if email already exists', async () => {
       mockUserModel.findOne.mockResolvedValue({ id: 1 });
 
-      await expect(service.register(createAuthDto)).rejects.toThrow(
+      await expect(service.register(createAuthDto, mockFile)).rejects.toThrow(
         BadRequestException,
       );
     });
