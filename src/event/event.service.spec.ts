@@ -4,7 +4,11 @@ import { getModelToken } from '@nestjs/mongoose';
 import { Event, EventStatus } from './entities/event.entity';
 import { Types } from 'mongoose';
 import { User } from '../user/entities/user.entity';
-import { NotFoundException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 
 describe('EventService', () => {
   let service: EventService;
@@ -87,8 +91,14 @@ describe('EventService', () => {
       const result = await service.findAll();
       expect(result).toEqual([mockEvent, mockEvent2]);
       expect(mockEventModel.find).toHaveBeenCalled();
-      expect(mockQuery.populate).toHaveBeenCalledWith('organizer');
-      expect(mockQuery.populate).toHaveBeenCalledWith('participants');
+      expect(mockQuery.populate).toHaveBeenCalledWith({
+        path: 'organizer',
+        select: 'firstName lastName email profilePicture role gender',
+      });
+      expect(mockQuery.populate).toHaveBeenCalledWith({
+        path: 'participants',
+        select: 'firstName lastName email profilePicture role gender',
+      });
     });
   });
 
@@ -99,8 +109,14 @@ describe('EventService', () => {
       expect(mockEventModel.findById).toHaveBeenCalledWith(
         mockEvent._id.toString(),
       );
-      expect(mockQuery.populate).toHaveBeenCalledWith('organizer');
-      expect(mockQuery.populate).toHaveBeenCalledWith('participants');
+      expect(mockQuery.populate).toHaveBeenCalledWith({
+        path: 'organizer',
+        select: 'firstName lastName email profilePicture role gender',
+      });
+      expect(mockQuery.populate).toHaveBeenCalledWith({
+        path: 'participants',
+        select: 'firstName lastName email profilePicture role gender',
+      });
     });
 
     it('should throw NotFoundException if event not found', async () => {
@@ -116,13 +132,21 @@ describe('EventService', () => {
       title: 'Updated Marathon',
     };
 
+    const owner = {
+      id: mockEvent.organizer.toString(),
+      role: 'organizer',
+    };
+
     it('should successfully update an event', async () => {
       const updatedEvent = { ...mockEvent, ...updateEventDto };
-      mockQuery.exec.mockResolvedValueOnce(updatedEvent);
+      mockQuery.exec
+        .mockResolvedValueOnce(mockEvent)
+        .mockResolvedValueOnce(updatedEvent);
 
       const result = await service.update(
         mockEvent._id.toString(),
         updateEventDto,
+        owner,
       );
       expect(result).toEqual(updatedEvent);
       expect(mockEventModel.findByIdAndUpdate).toHaveBeenCalledWith(
@@ -135,21 +159,132 @@ describe('EventService', () => {
     it('should throw NotFoundException if event not found', async () => {
       mockQuery.exec.mockResolvedValueOnce(null);
       await expect(
-        service.update('nonexistentId', updateEventDto),
+        service.update('nonexistentId', updateEventDto, owner),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects an organizer who does not own the event', async () => {
+      mockQuery.exec.mockResolvedValueOnce(mockEvent);
+
+      await expect(
+        service.update(mockEvent._id.toString(), updateEventDto, {
+          id: new Types.ObjectId().toString(),
+          role: 'organizer',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockEventModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to update an event they do not own', async () => {
+      const updatedEvent = { ...mockEvent, ...updateEventDto };
+      mockQuery.exec
+        .mockResolvedValueOnce(mockEvent)
+        .mockResolvedValueOnce(updatedEvent);
+
+      await expect(
+        service.update(mockEvent._id.toString(), updateEventDto, {
+          id: new Types.ObjectId().toString(),
+          role: 'admin',
+        }),
+      ).resolves.toEqual(updatedEvent);
+    });
+
+    it('does not let the request body change the organizer', async () => {
+      mockQuery.exec
+        .mockResolvedValueOnce(mockEvent)
+        .mockResolvedValueOnce(mockEvent);
+
+      await service.update(
+        mockEvent._id.toString(),
+        { ...updateEventDto, organizer: new Types.ObjectId().toString() },
+        owner,
+      );
+
+      expect(mockEventModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        mockEvent._id.toString(),
+        updateEventDto,
+        { new: true },
+      );
     });
   });
 
   describe('remove', () => {
     it('should successfully delete an event', async () => {
-      mockQuery.exec.mockResolvedValueOnce({ isDeleted: true });
+      mockQuery.exec.mockResolvedValueOnce(mockEvent);
 
-      const result = await service.remove(mockEvent._id.toString());
+      const result = await service.remove(mockEvent._id.toString(), {
+        id: mockEvent.organizer.toString(),
+        role: 'organizer',
+      });
       expect(result.message).toBe('Event deleted successfully');
       expect(mockEventModel.findByIdAndUpdate).toHaveBeenCalledWith(
         mockEvent._id.toString(),
         { isDeleted: true },
       );
+    });
+
+    it('rejects deletion by a different organizer', async () => {
+      mockQuery.exec.mockResolvedValueOnce(mockEvent);
+
+      await expect(
+        service.remove(mockEvent._id.toString(), {
+          id: new Types.ObjectId().toString(),
+          role: 'organizer',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('join', () => {
+    const openEvent = {
+      ...mockEvent,
+      status: EventStatus.SCHEDULED,
+      endDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    };
+
+    it('adds a participant to a scheduled event', async () => {
+      const participantId = new Types.ObjectId().toString();
+      const joined = { ...openEvent, participants: [participantId] };
+      mockQuery.exec.mockResolvedValueOnce(openEvent).mockResolvedValueOnce(joined);
+
+      const result = await service.join(openEvent._id.toString(), {
+        id: participantId,
+        role: 'participant',
+      });
+
+      expect(result).toEqual(joined);
+      expect(mockEventModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        openEvent._id.toString(),
+        { $addToSet: { participants: participantId } },
+      );
+      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(participantId, {
+        $addToSet: { attendingEvents: openEvent._id },
+      });
+    });
+
+    it('rejects an organizer joining an event', async () => {
+      mockQuery.exec.mockResolvedValueOnce(openEvent);
+
+      await expect(
+        service.join(openEvent._id.toString(), {
+          id: new Types.ObjectId().toString(),
+          role: 'organizer',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects a cancelled event', async () => {
+      mockQuery.exec.mockResolvedValueOnce({
+        ...openEvent,
+        status: EventStatus.CANCELLED,
+      });
+
+      await expect(
+        service.join(openEvent._id.toString(), {
+          id: new Types.ObjectId().toString(),
+          role: 'participant',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 });

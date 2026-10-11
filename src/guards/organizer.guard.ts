@@ -1,13 +1,14 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserRole } from '../user/entities/user.entity';
+import { authenticateAccessToken } from './access-token';
 
 @Injectable()
 export class OrganizerGuard implements CanActivate {
@@ -18,33 +19,16 @@ export class OrganizerGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
-    const token = this.extractTokenFromHeader(request);
+    const user = await authenticateAccessToken(
+      request,
+      this.jwtService,
+      this.userModel,
+    );
 
-    if (!token) {
-      throw new UnauthorizedException('No token provided');
+    if (user.role !== UserRole.ORGANIZER && user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Only organizers can access this resource');
     }
 
-    try {
-      const payload = await this.jwtService.verifyAsync(token);
-      const user = await this.userModel.findById(payload.id);
-
-      if (!user || user.role !== UserRole.ORGANIZER) {
-        throw new UnauthorizedException(
-          'Only organizers can access this resource',
-        );
-      }
-
-      request.user = user;
-      return true;
-    } catch {
-      throw new UnauthorizedException(
-        'Invalid token or insufficient permissions',
-      );
-    }
-  }
-
-  private extractTokenFromHeader(request: any): string | undefined {
-    const [type, token] = request.headers.authorization?.split(' ') ?? [];
-    return type === 'Bearer' ? token : undefined;
+    return true;
   }
 }

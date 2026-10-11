@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 
 export enum UserRole {
+  ADMIN = 'admin',
   ORGANIZER = 'organizer',
   PARTICIPANT = 'participant',
 }
@@ -21,7 +22,7 @@ export class User extends Document {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: true, select: false })
   password: string;
 
   @Prop({ type: String, enum: UserRole, default: UserRole.PARTICIPANT })
@@ -44,3 +45,11 @@ export class User extends Document {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+
+function stripPassword(_doc: unknown, ret: Record<string, unknown>) {
+  delete ret.password;
+  return ret;
+}
+
+UserSchema.set('toJSON', { transform: stripPassword });
+UserSchema.set('toObject', { transform: stripPassword });

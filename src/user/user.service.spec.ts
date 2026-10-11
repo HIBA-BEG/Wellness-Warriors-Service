@@ -3,16 +3,20 @@ import { UserService } from './user.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { User } from './entities/user.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ForbiddenException } from '@nestjs/common';
 
 describe('UserService', () => {
   let service: UserService;
 
+  const select = jest.fn();
+  const updateSelect = jest.fn();
+
   const mockUserModel = {
-    find: jest.fn(),
+    find: jest.fn(() => ({ select })),
     findById: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
-    findByIdAndUpdate: jest.fn(),
+    findByIdAndUpdate: jest.fn(() => ({ select: updateSelect })),
     findByIdAndDelete: jest.fn(),
   };
 
@@ -38,12 +42,13 @@ describe('UserService', () => {
         { _id: '2', email: 'test2@test.com' },
       ];
 
-      mockUserModel.find.mockResolvedValue(expectedUsers);
+      select.mockResolvedValue(expectedUsers);
 
       const result = await service.findAll();
 
       expect(result).toEqual(expectedUsers);
-      expect(mockUserModel.find).toHaveBeenCalled();
+      expect(mockUserModel.find).toHaveBeenCalledWith({ role: 'participant' });
+      expect(select).toHaveBeenCalledWith('-password');
     });
   });
 
@@ -54,13 +59,14 @@ describe('UserService', () => {
         _id: userId,
         email: 'test@test.com',
       };
-
-      mockUserModel.findById.mockResolvedValue(expectedUser);
+      const findSelect = jest.fn().mockResolvedValue(expectedUser);
+      mockUserModel.findById.mockReturnValue({ select: findSelect });
 
       const result = await service.findOne(userId);
 
       expect(result).toEqual(expectedUser);
       expect(mockUserModel.findById).toHaveBeenCalledWith(userId);
+      expect(findSelect).toHaveBeenCalledWith('-password');
     });
   });
 
@@ -77,9 +83,16 @@ describe('UserService', () => {
         ...updateUserDto,
       };
 
-      mockUserModel.findByIdAndUpdate.mockResolvedValue(expectedUser);
+      mockUserModel.findById.mockResolvedValue({
+        _id: userId,
+        role: 'participant',
+      });
+      updateSelect.mockResolvedValue(expectedUser);
 
-      const result = await service.update(userId, updateUserDto);
+      const result = await service.update(userId, updateUserDto, {
+        id: 'organizer-1',
+        role: 'organizer',
+      });
 
       expect(result).toEqual(expectedUser);
       expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
@@ -88,20 +101,58 @@ describe('UserService', () => {
         { new: true },
       );
     });
+
+    it('lets a user update their own account', async () => {
+      mockUserModel.findById.mockResolvedValue({
+        _id: '1',
+        role: 'participant',
+      });
+      updateSelect.mockResolvedValue({ _id: '1', firstName: 'Mine' });
+
+      await expect(
+        service.update(
+          '1',
+          { firstName: 'Mine' },
+          { id: '1', role: 'participant' },
+        ),
+      ).resolves.toEqual({ _id: '1', firstName: 'Mine' });
+    });
+
+    it('rejects updates to someone else account', async () => {
+      mockUserModel.findById.mockResolvedValue({
+        _id: '2',
+        role: 'organizer',
+      });
+
+      await expect(
+        service.update(
+          '2',
+          { firstName: 'Hijack' },
+          { id: '1', role: 'participant' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mockUserModel.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
   });
 
   describe('remove', () => {
     it('should delete a user', async () => {
       const userId = '1';
       const expectedResult = { message: 'User deleted successfully' };
-      const expectedUser = {
+
+      mockUserModel.findById.mockResolvedValue({
+        _id: userId,
+        role: 'participant',
+      });
+      mockUserModel.findByIdAndDelete.mockResolvedValue({
         _id: userId,
         email: 'test@test.com',
-      };
+      });
 
-      mockUserModel.findByIdAndDelete.mockResolvedValue(expectedUser);
-
-      const result = await service.remove(userId);
+      const result = await service.remove(userId, {
+        id: 'organizer-1',
+        role: 'organizer',
+      });
 
       expect(result).toEqual(expectedResult);
       expect(mockUserModel.findByIdAndDelete).toHaveBeenCalledWith(userId);

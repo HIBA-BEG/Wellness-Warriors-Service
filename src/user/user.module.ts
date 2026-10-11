@@ -7,6 +7,8 @@ import { ConfigModule } from '@nestjs/config';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { OrganizerGuard } from 'src/guards/organizer.guard';
+import { AccessTokenGuard } from 'src/guards/access-token.guard';
+import { jwtModuleOptions } from 'src/common/jwt-options';
 
 @Module({
   imports: [
@@ -14,14 +16,11 @@ import { OrganizerGuard } from 'src/guards/organizer.guard';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '1h' },
-      }),
+      useFactory: jwtModuleOptions,
     }),
   ],
   controllers: [UserController],
-  providers: [UserService, OrganizerGuard],
+  providers: [UserService, OrganizerGuard, AccessTokenGuard],
   exports: [MongooseModule, JwtModule, OrganizerGuard],
 })
 export class UserModule {}

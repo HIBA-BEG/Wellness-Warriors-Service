@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Event, EventSchema } from './entities/event.entity';
 import { UserModule } from '../user/user.module';
 import { User, UserSchema } from '../user/entities/user.entity';
+import { AccessTokenGuard } from 'src/guards/access-token.guard';
 import { OrganizerGuard } from 'src/guards/organizer.guard';
 
 @Module({
@@ -16,6 +17,6 @@ import { OrganizerGuard } from 'src/guards/organizer.guard';
     UserModule,
   ],
   controllers: [EventController],
-  providers: [EventService, OrganizerGuard],
+  providers: [EventService, OrganizerGuard, AccessTokenGuard],
 })
 export class EventModule {}
