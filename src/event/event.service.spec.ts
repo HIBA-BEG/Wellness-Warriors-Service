@@ -245,7 +245,9 @@ describe('EventService', () => {
     it('adds a participant to a scheduled event', async () => {
       const participantId = new Types.ObjectId().toString();
       const joined = { ...openEvent, participants: [participantId] };
-      mockQuery.exec.mockResolvedValueOnce(openEvent).mockResolvedValueOnce(joined);
+      mockQuery.exec
+        .mockResolvedValueOnce(openEvent)
+        .mockResolvedValueOnce(joined);
 
       const result = await service.join(openEvent._id.toString(), {
         id: participantId,
@@ -257,9 +259,12 @@ describe('EventService', () => {
         openEvent._id.toString(),
         { $addToSet: { participants: participantId } },
       );
-      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(participantId, {
-        $addToSet: { attendingEvents: openEvent._id },
-      });
+      expect(mockUserModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        participantId,
+        {
+          $addToSet: { attendingEvents: openEvent._id },
+        },
+      );
     });
 
     it('rejects an organizer joining an event', async () => {

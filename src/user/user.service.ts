@@ -43,7 +43,7 @@ export class UserService {
       throw new HttpException('User Not Found', HttpStatus.NOT_FOUND);
     }
 
-    this.assertCanModify(existing, actor);
+    await this.assertCanModify(existing, actor);
 
     const changes: Record<string, string> = {};
     for (const field of [
@@ -77,10 +77,7 @@ export class UserService {
       throw new HttpException('User not Found', HttpStatus.NOT_FOUND);
     }
 
-    const canDelete =
-      actor.role === UserRole.ADMIN ||
-      (actor.role === UserRole.ORGANIZER &&
-        existing.role === UserRole.PARTICIPANT);
+    const canDelete = await this.managesParticipant(existing, actor);
 
     if (!canDelete) {
       throw new ForbiddenException('You can only delete participant accounts');
@@ -90,14 +87,34 @@ export class UserService {
     return { message: 'User deleted successfully' };
   }
 
-  private assertCanModify(target: User, actor: AuthActor) {
+  private async assertCanModify(target: User, actor: AuthActor) {
     const isSelf = String(target._id) === String(actor.id);
-    const managesParticipant =
-      (actor.role === UserRole.ORGANIZER || actor.role === UserRole.ADMIN) &&
-      target.role === UserRole.PARTICIPANT;
-
-    if (!isSelf && !managesParticipant && actor.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('You can only modify your own account');
+    if (isSelf || (await this.managesParticipant(target, actor))) {
+      return;
     }
+
+    throw new ForbiddenException('You can only modify your own account');
+  }
+
+  private async managesParticipant(target: User, actor: AuthActor) {
+    if (target.role !== UserRole.PARTICIPANT) {
+      return false;
+    }
+
+    if (actor.role === UserRole.ADMIN) {
+      return true;
+    }
+
+    if (actor.role !== UserRole.ORGANIZER) {
+      return false;
+    }
+
+    const organizer = await this.userModel.findById(actor.id);
+    const created = new Set(
+      (organizer?.createdEvents || []).map((eventId) => String(eventId)),
+    );
+    return (target.attendingEvents || []).some((eventId) =>
+      created.has(String(eventId)),
+    );
   }
 }

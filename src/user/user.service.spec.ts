@@ -83,9 +83,20 @@ describe('UserService', () => {
         ...updateUserDto,
       };
 
-      mockUserModel.findById.mockResolvedValue({
-        _id: userId,
-        role: 'participant',
+      mockUserModel.findById.mockImplementation((id) => {
+        if (id === 'organizer-1') {
+          return Promise.resolve({
+            _id: id,
+            role: 'organizer',
+            createdEvents: ['event-1'],
+          });
+        }
+
+        return Promise.resolve({
+          _id: id,
+          role: 'participant',
+          attendingEvents: ['event-1'],
+        });
       });
       updateSelect.mockResolvedValue(expectedUser);
 
@@ -140,9 +151,20 @@ describe('UserService', () => {
       const userId = '1';
       const expectedResult = { message: 'User deleted successfully' };
 
-      mockUserModel.findById.mockResolvedValue({
-        _id: userId,
-        role: 'participant',
+      mockUserModel.findById.mockImplementation((id) => {
+        if (id === 'organizer-1') {
+          return Promise.resolve({
+            _id: id,
+            role: 'organizer',
+            createdEvents: ['event-1'],
+          });
+        }
+
+        return Promise.resolve({
+          _id: id,
+          role: 'participant',
+          attendingEvents: ['event-1'],
+        });
       });
       mockUserModel.findByIdAndDelete.mockResolvedValue({
         _id: userId,

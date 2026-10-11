@@ -44,6 +44,7 @@ export class AuthenticationController {
   }
 
   @Get('verify')
+  @Throttle({ default: { limit: 120, ttl: 60000 } })
   verifyToken(@Headers('authorization') authorization?: string) {
     if (!authorization) {
       throw new UnauthorizedException('No token provided');

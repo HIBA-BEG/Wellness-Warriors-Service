@@ -36,6 +36,8 @@ The API listens on `http://localhost:3000`.
 | `SMTP_PASS` | for email | SMTP password. |
 | `SMTP_FROM` | no | Display name on outgoing mail. |
 | `SMTP_ALLOW_INVALID_CERTS` | no | Set to `true` only when the SMTP server uses a certificate you cannot verify. |
+| `NODE_ENV` | no | Set to `production` on Render. The seed then requires `SEED_CONFIRM=yes`. |
+| `SEED_CONFIRM` | no | Set to `yes` only to allow `npm run seed` when `NODE_ENV=production`. |
 
 Older names still work as fallbacks: `MONGODB_URI`, `APP_EMAIL`, `APP_EMAIL_PASS`, `APP_EMAIL_USERNAME`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`. New deployments should use the names in the table.
 
@@ -44,21 +46,17 @@ Older names still work as fallbacks: `MONGODB_URI`, `APP_EMAIL`, `APP_EMAIL_PASS
 ```powershell
 npm run seed
 ```
-MONGODB_URI=mongodb://localhost:27017/WellnessWarriors
-JWT_SECRET=your_jwt_secret_key
-PORT=3000
-```
 
-## 🖥 Available Scripts
+The command is safe to run more than once on a local database. It resets the demo passwords, replaces the event list, and removes participant accounts that are not part of this demo. It prints the database host and name, without the password, before it changes anything.
 
-The command is safe to run more than once. It resets the demo passwords, replaces the event list, and removes participant accounts that are not part of this demo.
+When `NODE_ENV` is `production`, the seed stops unless `SEED_CONFIRM=yes`. It is not part of `npm start` or `npm run start:prod`.
 
 | Account | Password | Role |
 | --- | --- | --- |
 | `organizer@wellnesswarriors.demo` | `OrganizerDemo123!` | organizer |
 | 30 participants, such as `amina.bennani@wellnesswarriors.demo` | `ParticipantDemo123!` | participant |
 
-The organizer owns 20 events across Morocco: completed sessions from the past few weeks, scheduled sessions still to come, and two cancellations. Each person has a profile picture and each event has a poster. Image files live in `seed-images/`. The seed copies them into `uploads/` and `uploads-profile/` next to the API process. Those two folders stay out of git because local-disk uploads are ephemeral on free hosting. Public registration always creates a participant. It cannot create an organizer or an admin.
+The organizer owns 20 events across Morocco: completed sessions from the past few weeks, scheduled sessions still to come, and two cancellations. Each person has a profile picture and each event has a poster. Those files stay in `seed-images/` and the API serves them from `/seed-images/`. The database stores a relative path such as `/seed-images/events/e01.jpg`. Public registration always creates a participant. It cannot create an organizer or an admin.
 
 ## Scripts
 
@@ -72,13 +70,14 @@ npm run seed
 
 ## Docker
 
-From the repository root, copy `wellness-warriors-server/.env.example` to `wellness-warriors-server/.env`, set `JWT_SECRET`, then:
+From this folder, set `JWT_SECRET` in the shell, then:
 
 ```powershell
+$env:JWT_SECRET = "replace-with-a-long-random-string"
 docker compose up --build
 ```
 
-Compose starts MongoDB, the API on port 3000, and the client on port 5173. Inside Compose, `MONGO_URI` points at the MongoDB service.
+`docker-compose.yml` starts MongoDB and the API on port 3000. Run the React client separately. Inside Compose, `MONGO_URI` points at the MongoDB service.
 
 ## Uploads
 
@@ -88,4 +87,9 @@ Local-disk uploads are ephemeral on free hosting (including Render's free web se
 
 ## Render
 
-Set `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL` (your Vercel URL), and `PORT` is provided by Render. Add the SMTP variables if password reset should send mail. The service listens on `0.0.0.0` and `process.env.PORT`.
+Use Node `20` (`NODE_VERSION=20`).
+
+- Build command: `npm ci && npm run build`
+- Start command: `npm run start:prod`
+
+Set `MONGO_URI`, `JWT_SECRET`, and `CLIENT_URL` (your Vercel URL). Render sets `PORT`. Leave SMTP unset on the free plan: outbound mail ports are blocked, and forgot-password returns 503 instead of hanging. Do not set `SEED_CONFIRM` on the web service. Demo posters and profile pictures are served from `seed-images/` in the image, so they survive a restart. Files uploaded after that still live on the local disk and disappear when the instance restarts.

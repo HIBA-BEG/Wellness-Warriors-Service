@@ -42,12 +42,16 @@ export class User extends Document {
 
   @Prop({ type: [{ type: Types.ObjectId, ref: 'Event' }] })
   createdEvents: Types.ObjectId[];
+
+  @Prop({ default: 0 })
+  tokenVersion: number;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
 function stripPassword(_doc: unknown, ret: Record<string, unknown>) {
   delete ret.password;
+  delete ret.tokenVersion;
   return ret;
 }
 

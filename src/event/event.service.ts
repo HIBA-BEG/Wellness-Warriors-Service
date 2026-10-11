@@ -52,15 +52,17 @@ export class EventService {
     return savePublicImage(file, 'uploads');
   }
 
-  async findAll(): Promise<Event[]> {
-    return this.eventModel
+  async findAll(actor?: AuthActor): Promise<Event[]> {
+    const events = await this.eventModel
       .find({ isDeleted: false })
       .populate({ path: 'organizer', select: PUBLIC_USER_FIELDS })
       .populate({ path: 'participants', select: PUBLIC_USER_FIELDS })
       .exec();
+
+    return events.map((event) => this.forViewer(event, actor));
   }
 
-  async findOne(id: string): Promise<Event> {
+  async findOne(id: string, actor?: AuthActor): Promise<Event> {
     const event = await this.eventModel
       .findById(id)
       .populate({ path: 'organizer', select: PUBLIC_USER_FIELDS })
@@ -70,7 +72,7 @@ export class EventService {
     if (!event || event.isDeleted) {
       throw new NotFoundException('Event not found');
     }
-    return event;
+    return this.forViewer(event, actor);
   }
 
   async update(
@@ -114,7 +116,7 @@ export class EventService {
       { $addToSet: { attendingEvents: updatedEvent._id } },
     );
 
-    return updatedEvent;
+    return this.forViewer(updatedEvent, actor);
   }
 
   async join(id: string, actor: AuthActor): Promise<Event> {
@@ -132,7 +134,7 @@ export class EventService {
       $addToSet: { attendingEvents: event._id },
     });
 
-    return this.findOne(id);
+    return this.findOne(id, actor);
   }
 
   async leave(id: string, actor: AuthActor): Promise<Event> {
@@ -155,7 +157,7 @@ export class EventService {
       $pull: { attendingEvents: event._id },
     });
 
-    return this.findOne(id);
+    return this.findOne(id, actor);
   }
 
   async remove(id: string, actor: AuthActor): Promise<{ message: string }> {
@@ -169,6 +171,41 @@ export class EventService {
     await this.eventModel.findByIdAndUpdate(id, { isDeleted: true }).exec();
 
     return { message: 'Event deleted successfully' };
+  }
+
+  private forViewer(event: Event, actor?: AuthActor): Event {
+    if (
+      !actor ||
+      actor.role === UserRole.ADMIN ||
+      this.organizerId(event) === String(actor.id)
+    ) {
+      return event;
+    }
+
+    const source = (
+      typeof event.toObject === 'function' ? event.toObject() : event
+    ) as Event & {
+      participants?: Array<{
+        _id?: unknown;
+        firstName?: string;
+        lastName?: string;
+        profilePicture?: string;
+      }>;
+    };
+    const participants = (source.participants || []).map((person) => {
+      if (!person || typeof person !== 'object') {
+        return person;
+      }
+
+      return {
+        _id: person._id,
+        firstName: person.firstName,
+        lastName: person.lastName,
+        profilePicture: person.profilePicture,
+      };
+    });
+
+    return { ...source, participants } as Event;
   }
 
   private async findActiveEvent(id: string): Promise<Event> {
@@ -185,7 +222,9 @@ export class EventService {
     }
 
     if (this.organizerId(event) === String(actor.id)) {
-      throw new BadRequestException('The organizer is already hosting this event');
+      throw new BadRequestException(
+        'The organizer is already hosting this event',
+      );
     }
   }
 

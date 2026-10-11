@@ -34,6 +34,8 @@ export function storedAssetPath(value?: string): string | undefined {
     return value;
   }
 
-  const match = value.match(/(\/uploads(?:-profile)?\/[^/?#]+)$/);
+  const match = value.match(
+    /(\/(?:uploads(?:-profile)?|seed-images)\/[^?#]+)$/,
+  );
   return match ? match[1] : value;
 }

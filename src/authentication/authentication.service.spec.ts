@@ -231,9 +231,13 @@ describe('AuthenticationService', () => {
 
     it('signs reset tokens with their own expiry', async () => {
       process.env.JWT_RESET_EXPIRES = '30m';
+      process.env.SMTP_HOST = 'smtp.example.com';
+      process.env.SMTP_USER = 'mailer@example.com';
+      process.env.SMTP_PASS = 'secret';
       mockUserModel.findOne.mockResolvedValue({
         _id: 'user-1',
         email: 'test@test.com',
+        tokenVersion: 0,
       });
       mockJwtService.sign.mockReturnValue('reset-token');
       mockMailerService.sendMail.mockResolvedValue({});
