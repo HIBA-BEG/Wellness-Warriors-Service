@@ -77,6 +77,9 @@ import { AssetUrlInterceptor } from './common/asset-url.interceptor';
               user,
               pass,
             },
+            connectionTimeout: 5000,
+            greetingTimeout: 5000,
+            socketTimeout: 8000,
             ...(allowInvalidCerts
               ? { tls: { rejectUnauthorized: false } }
               : {}),

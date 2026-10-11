@@ -52,20 +52,23 @@ function emailFor(firstName: string, lastName: string) {
   return `${local}@wellnesswarriors.demo`;
 }
 
-export const DEMO_PARTICIPANTS = roster.map(([firstName, lastName, gender], index) => {
-  const id = String(index + 1).padStart(2, '0');
-  return {
-    firstName,
-    lastName,
-    gender,
-    email: emailFor(firstName, lastName),
-    picture: `profiles/p${id}.png`,
-  };
-});
+export const DEMO_PARTICIPANTS = roster.map(
+  ([firstName, lastName, gender], index) => {
+    const id = String(index + 1).padStart(2, '0');
+    return {
+      firstName,
+      lastName,
+      gender,
+      email: emailFor(firstName, lastName),
+      picture: `profiles/p${id}.png`,
+    };
+  },
+);
 
 function attendees(start: number, count: number) {
   return Array.from({ length: count }, (_, offset) => {
-    const person = DEMO_PARTICIPANTS[(start + offset) % DEMO_PARTICIPANTS.length];
+    const person =
+      DEMO_PARTICIPANTS[(start + offset) % DEMO_PARTICIPANTS.length];
     return person.email;
   });
 }

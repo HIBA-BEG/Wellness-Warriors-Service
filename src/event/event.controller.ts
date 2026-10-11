@@ -72,16 +72,33 @@ export class EventController {
     );
   }
 
+  @Post('poster')
+  @UseGuards(OrganizerGuard)
+  async uploadPoster(@Req() request: FastifyRequest) {
+    const { file } = await readMultipart(request);
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    return { poster: await this.eventService.uploadEventImage(file) };
+  }
+
   @Get()
   @UseGuards(AccessTokenGuard)
-  async findAll() {
-    return await this.eventService.findAll();
+  async findAll(@Req() request: AuthenticatedRequest) {
+    return await this.eventService.findAll({
+      id: String(request.user._id),
+      role: request.user.role,
+    });
   }
 
   @Get(':id')
   @UseGuards(AccessTokenGuard)
-  async findOne(@Param('id') id: string) {
-    return await this.eventService.findOne(id);
+  async findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return await this.eventService.findOne(id, {
+      id: String(request.user._id),
+      role: request.user.role,
+    });
   }
 
   @Post(':id/join')

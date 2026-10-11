@@ -23,7 +23,10 @@ function rewriteAssets(
     return value;
   }
 
-  if (value instanceof Types.ObjectId || (value as { _bsontype?: string })._bsontype === 'ObjectId') {
+  if (
+    value instanceof Types.ObjectId ||
+    (value as { _bsontype?: string })._bsontype === 'ObjectId'
+  ) {
     return String(value);
   }
 

@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -122,14 +123,26 @@ export class AuthenticationService {
     };
   }
 
-  async forgotPassword(email: string): Promise<{ email: string }> {
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    this.assertSmtpConfigured();
+
+    const generic = {
+      message:
+        'If an account exists for that email, a reset link has been sent.',
+    };
     const user = await this.userModel.findOne({ email });
     if (!user) {
-      throw new UnauthorizedException('User with this email does not exist');
+      return generic;
     }
 
+    const tokenVersion = user.tokenVersion ?? 0;
     const resetToken = this.jwtService.sign(
-      { id: user._id, email: user.email, type: TokenType.RESET },
+      {
+        id: user._id,
+        email: user.email,
+        type: TokenType.RESET,
+        tokenVersion,
+      },
       { secret: process.env.JWT_SECRET, expiresIn: resetTokenExpires() },
     );
 
@@ -153,10 +166,12 @@ export class AuthenticationService {
       });
     } catch (emailError) {
       console.error('Email sending error:', emailError);
-      throw new Error('Failed to send reset email. Please try again later.');
+      throw new ServiceUnavailableException(
+        'Password reset email is unavailable because the mail server could not be reached.',
+      );
     }
 
-    return { email: user.email };
+    return generic;
   }
 
   async resetPassword(
@@ -170,10 +185,32 @@ export class AuthenticationService {
       throw new UnauthorizedException('User not found');
     }
 
+    const tokenVersion = user.tokenVersion ?? 0;
+    if (decoded.tokenVersion !== tokenVersion) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
     user.password = await bcrypt.hash(newPassword, 10);
+    user.tokenVersion = tokenVersion + 1;
     await user.save();
 
     return { message: 'Password has been successfully reset' };
+  }
+
+  private assertSmtpConfigured() {
+    const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
+    const user =
+      process.env.SMTP_USER || process.env.APP_EMAIL || process.env.MAIL_USER;
+    const pass =
+      process.env.SMTP_PASS ||
+      process.env.APP_EMAIL_PASS ||
+      process.env.MAIL_PASS;
+
+    if (!host || !user || !pass) {
+      throw new ServiceUnavailableException(
+        'Password reset email is unavailable because SMTP is not configured.',
+      );
+    }
   }
 
   private verifyPurpose(token: string, purpose: TokenType) {

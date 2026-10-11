@@ -1,6 +1,4 @@
 import 'dotenv/config';
-import { copyFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import * as bcrypt from 'bcryptjs';
 import mongoose, { Types } from 'mongoose';
 import {
@@ -49,18 +47,22 @@ function daysFromNow(days: number, hour: number): Date {
   return date;
 }
 
-async function publishImage(
-  sourceName: string,
-  folder: 'uploads' | 'uploads-profile',
-  fileName: string,
-) {
-  const destDir = join(process.cwd(), folder);
-  await mkdir(destDir, { recursive: true });
-  await copyFile(
-    join(process.cwd(), 'seed-images', sourceName),
-    join(destDir, fileName),
-  );
-  return `/${folder}/${fileName}`;
+function seedImagePath(sourceName: string) {
+  return `/seed-images/${sourceName.replace(/\\/g, '/')}`;
+}
+
+function databaseTarget(uri: string): { host: string; name: string } {
+  const withoutProtocol = uri.replace(/^mongodb(\+srv)?:\/\//, '');
+  const withoutAuth = withoutProtocol.includes('@')
+    ? withoutProtocol.slice(withoutProtocol.lastIndexOf('@') + 1)
+    : withoutProtocol;
+  const slash = withoutAuth.indexOf('/');
+  const host =
+    slash === -1 ? withoutAuth.split('?')[0] : withoutAuth.slice(0, slash);
+  const name =
+    (slash === -1 ? '' : withoutAuth.slice(slash + 1).split('?')[0]) ||
+    '(default)';
+  return { host, name };
 }
 
 async function upsertUser(
@@ -76,11 +78,7 @@ async function upsertUser(
   },
 ) {
   const password = await bcrypt.hash(data.password, 10);
-  const profilePicture = await publishImage(
-    data.picture,
-    'uploads-profile',
-    `${data.email.split('@')[0].replace(/\./g, '-')}.png`,
-  );
+  const profilePicture = seedImagePath(data.picture);
   return User.findOneAndUpdate(
     { email: data.email },
     {
@@ -101,6 +99,19 @@ async function seed() {
   const uri = process.env.MONGO_URI || process.env.MONGODB_URI;
   if (!uri) {
     throw new Error('MONGO_URI is required');
+  }
+
+  const target = databaseTarget(uri);
+  console.log(
+    `This seed replaces demo data in database "${target.name}" on ${target.host}.`,
+  );
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.SEED_CONFIRM !== 'yes'
+  ) {
+    throw new Error(
+      'Refusing to seed a production database. Set SEED_CONFIRM=yes to confirm this wipe.',
+    );
   }
 
   await mongoose.connect(uri);
@@ -131,12 +142,10 @@ async function seed() {
   const eventIds: Types.ObjectId[] = [];
   const eventDefinitions = [];
   for (const definition of DEMO_EVENTS) {
-    const poster = await publishImage(
-      definition.poster,
-      'uploads',
-      definition.poster.split('/')[1],
+    const poster = seedImagePath(definition.poster);
+    const participantIds = definition.participants.map(
+      (email) => byEmail[email],
     );
-    const participantIds = definition.participants.map((email) => byEmail[email]);
     const event = await Event.findOneAndUpdate(
       { title: definition.title },
       {
@@ -188,7 +197,9 @@ async function seed() {
   console.log(
     `${DEMO_PARTICIPANTS.length} participants / ${PARTICIPANT_PASSWORD}`,
   );
-  console.log(`${DEMO_EVENTS.length} events, with posters and profile pictures.`);
+  console.log(
+    `${DEMO_EVENTS.length} events, with posters and profile pictures.`,
+  );
 }
 
 seed()

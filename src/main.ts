@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
+import { HttpAdapterHost, NestFactory } from '@nestjs/core';
+import { MongoExceptionFilter } from './common/mongo-exception.filter';
 import { AppModule } from './app.module';
 import {
   FastifyAdapter,
@@ -29,6 +30,8 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter({ trustProxy: true }),
   );
+
+  app.useGlobalFilters(new MongoExceptionFilter(app.get(HttpAdapterHost)));
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -63,6 +66,12 @@ async function bootstrap() {
   await app.register(fastifyStatic as any, {
     root: profileUploadsDir,
     prefix: '/uploads-profile/',
+    decorateReply: false,
+  });
+
+  await app.register(fastifyStatic as any, {
+    root: join(process.cwd(), 'seed-images'),
+    prefix: '/seed-images/',
     decorateReply: false,
   });
 
