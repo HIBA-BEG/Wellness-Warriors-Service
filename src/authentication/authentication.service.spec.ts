@@ -7,17 +7,21 @@ import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import * as bcrypt from 'bcryptjs';
 import { FileUpload } from '../types/file-upload.interface';
+import { TokenType } from '../common/token-type';
+import { UserRole } from '../user/entities/user.entity';
 
 describe('AuthenticationService', () => {
   let service: AuthenticationService;
 
   const mockUserModel = {
     findOne: jest.fn(),
+    findById: jest.fn(),
     create: jest.fn(),
   };
 
   const mockJwtService = {
     sign: jest.fn(),
+    verify: jest.fn(),
   };
 
   const mockMailerService = {
@@ -73,8 +77,8 @@ describe('AuthenticationService', () => {
     it('should successfully register a new user', async () => {
       const savedUser = {
         _id: 'mockId',
-        ...createAuthDto,
-        password: 'hashedPassword',
+        email: createAuthDto.email,
+        role: UserRole.PARTICIPANT,
       };
 
       mockUserModel.findOne.mockResolvedValue(null);
@@ -89,15 +93,42 @@ describe('AuthenticationService', () => {
         email: createAuthDto.email,
       });
       expect(mockUserModel.create).toHaveBeenCalledWith({
-        ...createAuthDto,
+        firstName: createAuthDto.firstName,
+        lastName: createAuthDto.lastName,
+        email: createAuthDto.email,
+        gender: createAuthDto.gender,
         password: expect.any(String),
         profilePicture: expect.any(String),
+        role: UserRole.PARTICIPANT,
       });
-      expect(mockJwtService.sign).toHaveBeenCalledWith({
-        id: savedUser._id,
-        email: savedUser.email,
-        role: savedUser.role,
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        {
+          id: savedUser._id,
+          email: savedUser.email,
+          role: UserRole.PARTICIPANT,
+          type: TokenType.ACCESS,
+        },
+        { expiresIn: '1h' },
+      );
+    });
+
+    it('forces the participant role even when the request asks for organizer', async () => {
+      mockUserModel.findOne.mockResolvedValue(null);
+      mockUserModel.create.mockResolvedValue({
+        _id: 'mockId',
+        email: createAuthDto.email,
+        role: UserRole.PARTICIPANT,
       });
+      mockJwtService.sign.mockReturnValue('mock_token');
+
+      await service.register(
+        { ...createAuthDto, role: UserRole.ORGANIZER },
+        mockFile,
+      );
+
+      expect(mockUserModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: UserRole.PARTICIPANT }),
+      );
     });
 
     it('should throw BadRequestException if email already exists', async () => {
@@ -115,14 +146,21 @@ describe('AuthenticationService', () => {
       password: 'password123',
     };
 
+    const mockLoginQuery = (user: unknown) => {
+      const select = jest.fn().mockResolvedValue(user);
+      mockUserModel.findOne.mockReturnValue({ select });
+      return select;
+    };
+
     it('should successfully login a user', async () => {
       const mockUser = {
         _id: 'mockId',
         email: loginAuthDto.email,
+        role: UserRole.PARTICIPANT,
         password: await bcrypt.hash(loginAuthDto.password, 10),
       };
 
-      mockUserModel.findOne.mockResolvedValue(mockUser);
+      const select = mockLoginQuery(mockUser);
       mockJwtService.sign.mockReturnValue('mock_token');
 
       const result = await service.login(loginAuthDto);
@@ -132,14 +170,20 @@ describe('AuthenticationService', () => {
       expect(mockUserModel.findOne).toHaveBeenCalledWith({
         email: loginAuthDto.email,
       });
-      expect(mockJwtService.sign).toHaveBeenCalledWith({
-        id: mockUser._id,
-        email: mockUser.email,
-      });
+      expect(select).toHaveBeenCalledWith('+password');
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        {
+          id: mockUser._id,
+          email: mockUser.email,
+          role: mockUser.role,
+          type: TokenType.ACCESS,
+        },
+        { expiresIn: '1h' },
+      );
     });
 
     it('should throw UnauthorizedException if user not found', async () => {
-      mockUserModel.findOne.mockResolvedValue(null);
+      mockLoginQuery(null);
 
       await expect(service.login(loginAuthDto)).rejects.toThrow(
         UnauthorizedException,
@@ -147,16 +191,58 @@ describe('AuthenticationService', () => {
     });
 
     it('should throw UnauthorizedException if password is incorrect', async () => {
-      const mockUser = {
+      mockLoginQuery({
         _id: 'mockId',
         email: loginAuthDto.email,
         password: await bcrypt.hash('differentpassword', 10),
-      };
-
-      mockUserModel.findOne.mockResolvedValue(mockUser);
+      });
 
       await expect(service.login(loginAuthDto)).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+  });
+
+  describe('token purpose', () => {
+    it('rejects an access token used to reset a password', async () => {
+      mockJwtService.verify.mockReturnValue({
+        id: 'user-1',
+        email: 'test@test.com',
+        type: TokenType.ACCESS,
+      });
+
+      await expect(
+        service.resetPassword('access-token', 'newpassword1'),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(mockUserModel.findById).not.toHaveBeenCalled();
+    });
+
+    it('rejects a reset token used as a session token', async () => {
+      mockJwtService.verify.mockReturnValue({
+        id: 'user-1',
+        email: 'test@test.com',
+        type: TokenType.RESET,
+      });
+
+      await expect(service.verifyToken('reset-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('signs reset tokens with their own expiry', async () => {
+      process.env.JWT_RESET_EXPIRES = '30m';
+      mockUserModel.findOne.mockResolvedValue({
+        _id: 'user-1',
+        email: 'test@test.com',
+      });
+      mockJwtService.sign.mockReturnValue('reset-token');
+      mockMailerService.sendMail.mockResolvedValue({});
+
+      await service.forgotPassword('test@test.com');
+
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ type: TokenType.RESET }),
+        expect.objectContaining({ expiresIn: '30m' }),
       );
     });
   });

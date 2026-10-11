@@ -17,9 +17,11 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "seed": "ts-node -r tsconfig-paths/register src/seed.ts"
   },
   "dependencies": {
+    "@fastify/helmet": "^11.1.1",
     "@fastify/multipart": "^7.7.3",
     "@fastify/static": "^7.0.4",
     "@nestjs-modules/mailer": "^2.0.2",
@@ -31,6 +33,7 @@
     "@nestjs/platform-express": "^10.4.12",
     "@nestjs/platform-fastify": "^10.4.13",
     "@nestjs/swagger": "^8.0.7",
+    "@nestjs/throttler": "^6.7.1",
     "@prisma/client": "^5.22.0",
     "@types/multer": "^1.4.12",
     "bcryptjs": "^2.4.3",

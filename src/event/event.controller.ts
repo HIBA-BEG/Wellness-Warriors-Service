@@ -11,101 +11,116 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { EventService } from './event.service';
-import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
-import { OrganizerGuard } from 'src/guards/organizer.guard';
+import { AccessTokenGuard } from '../guards/access-token.guard';
+import { OrganizerGuard } from '../guards/organizer.guard';
 import { FastifyRequest } from 'fastify';
-import { FileUpload } from '../types/file-upload.interface';
 import { EventStatus } from './entities/event.entity';
+import { User } from '../user/entities/user.entity';
+import { readMultipart } from '../common/multipart';
+import { Types } from 'mongoose';
+
+type AuthenticatedRequest = FastifyRequest & { user: User };
 
 @Controller('event')
-@UseGuards(OrganizerGuard)
 export class EventController {
   constructor(private readonly eventService: EventService) {}
 
-  //   @Post()
-  //   async create(@Body() createEventDto: CreateEventDto) {
-  //   return await this.eventService.create(createEventDto);
-  // }
-
   @Post()
-  async create(@Req() request: FastifyRequest) {
-    try {
-      // console.log('Request received:', request.headers);
+  @UseGuards(OrganizerGuard)
+  async create(@Req() request: AuthenticatedRequest) {
+    const { fields, file } = await readMultipart(request);
 
-      const data = await request.file();
-      // console.log('File data:', data);
-
-      if (!data) {
-        throw new BadRequestException('No file uploaded');
-      }
-
-      const chunks = [];
-      for await (const chunk of data.file) {
-        chunks.push(chunk);
-      }
-      const buffer = Buffer.concat(chunks);
-      // console.log('Buffer created successfully, size:', buffer.length);
-
-      const createEventDto: CreateEventDto = {
-        title: data.fields.title['value'],
-        description: data.fields.description['value'],
-        location: data.fields.location['value'],
-        startDate: new Date(JSON.parse(data.fields.startDate['value'])),
-        endDate: new Date(JSON.parse(data.fields.endDate['value'])),
-        organizer: data.fields.organizer['value'],
-        participants: JSON.parse(data.fields.participants['value']),
-        status: EventStatus.SCHEDULED,
-      };
-
-      // console.log('CreateEventDto:', createEventDto);
-
-      const fileUpload: FileUpload = {
-        buffer,
-        originalname: data.filename,
-        mimetype: data.mimetype,
-      };
-
-      // console.log('About to create event with:', {
-      //   dto: createEventDto,
-      //   file: {
-      //     name: fileUpload.originalname,
-      //     size: fileUpload.buffer.length,
-      //     type: fileUpload.mimetype
-      //   }
-      // });
-
-      // const result = await this.eventService.create(createEventDto, fileUpload);
-      // console.log('Service create completed successfully:', result);
-      // return result;
-
-      return await this.eventService.create(createEventDto, fileUpload);
-    } catch (error) {
-      console.error('Error details:', error.message);
-      throw new BadRequestException('Invalid file upload');
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
     }
+
+    let participants = [];
+    if (fields.participants) {
+      try {
+        participants = JSON.parse(fields.participants);
+      } catch {
+        throw new BadRequestException('Invalid participants');
+      }
+    }
+
+    let startDate: Date;
+    let endDate: Date;
+    try {
+      startDate = new Date(JSON.parse(fields.startDate));
+      endDate = new Date(JSON.parse(fields.endDate));
+    } catch {
+      throw new BadRequestException('Invalid event dates');
+    }
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      throw new BadRequestException('Invalid event dates');
+    }
+
+    return this.eventService.create(
+      {
+        title: fields.title,
+        description: fields.description,
+        location: fields.location,
+        startDate,
+        endDate,
+        organizer: request.user._id as Types.ObjectId,
+        participants,
+        status: EventStatus.SCHEDULED,
+      },
+      file,
+    );
   }
 
   @Get()
+  @UseGuards(AccessTokenGuard)
   async findAll() {
     return await this.eventService.findAll();
   }
 
   @Get(':id')
+  @UseGuards(AccessTokenGuard)
   async findOne(@Param('id') id: string) {
     return await this.eventService.findOne(id);
   }
 
+  @Post(':id/join')
+  @UseGuards(AccessTokenGuard)
+  async join(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.eventService.join(id, {
+      id: String(request.user._id),
+      role: request.user.role,
+    });
+  }
+
+  @Delete(':id/join')
+  @UseGuards(AccessTokenGuard)
+  async leave(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return this.eventService.leave(id, {
+      id: String(request.user._id),
+      role: request.user.role,
+    });
+  }
+
   @Patch(':id')
+  @UseGuards(OrganizerGuard)
   async update(
     @Param('id') id: string,
     @Body() updateEventDto: UpdateEventDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return await this.eventService.update(id, updateEventDto);
+    return await this.eventService.update(id, updateEventDto, {
+      id: String(request.user._id),
+      role: request.user.role,
+    });
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    return await this.eventService.remove(id);
+  @UseGuards(OrganizerGuard)
+  async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest) {
+    return await this.eventService.remove(id, {
+      id: String(request.user._id),
+      role: request.user.role,
+    });
   }
 }

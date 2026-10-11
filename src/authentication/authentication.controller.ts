@@ -1,58 +1,41 @@
 import {
-  Controller,
-  Post,
   Body,
+  Controller,
   Get,
   Headers,
-  BadRequestException,
+  Post,
   Req,
+  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
-import { AuthenticationService } from './authentication.service';
-import { CreateAuthenticationDto } from './dto/create-authentication.dto';
-import { LoginAuthenticationDto } from './dto/login-authentication.dto';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { FastifyRequest } from 'fastify';
-import { FileUpload } from 'src/types/file-upload.interface';
+import { AuthenticationService } from './authentication.service';
+import { LoginAuthenticationDto } from './dto/login-authentication.dto';
+import { RegisterAuthenticationDto } from './dto/register-authentication.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { assertValid, readMultipart } from '../common/multipart';
 
 @Controller('auth')
+@UseGuards(ThrottlerGuard)
+@Throttle({ default: { limit: 10, ttl: 60000 } })
 export class AuthenticationController {
   constructor(private readonly authenticationService: AuthenticationService) {}
 
   @Post('register')
   async register(@Req() request: FastifyRequest) {
-    const data = await request.file();
+    const { fields, file } = await readMultipart(request);
+    const createAuthDto = await assertValid(RegisterAuthenticationDto, {
+      firstName: fields.firstName,
+      lastName: fields.lastName,
+      email: fields.email,
+      password: fields.password,
+      gender: fields.genre || fields.gender,
+      role: fields.role,
+    });
 
-    if (!data) {
-      throw new BadRequestException('No file uploaded');
-    }
-
-    const getFieldValue = (field: any): string => {
-      if (!field) return '';
-      if (Array.isArray(field)) return field[0].value;
-      return field.value;
-    };
-
-    const createAuthDto: CreateAuthenticationDto = {
-      firstName: getFieldValue(data.fields.firstName),
-      lastName: getFieldValue(data.fields.lastName),
-      email: getFieldValue(data.fields.email),
-      password: getFieldValue(data.fields.password),
-      role: getFieldValue(data.fields.role),
-      gender: getFieldValue(data.fields.genre),
-    };
-
-    const chunks = [];
-    for await (const chunk of data.file) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    const fileUpload: FileUpload = {
-      buffer,
-      originalname: data.filename,
-      mimetype: data.mimetype,
-    };
-
-    return await this.authenticationService.register(createAuthDto, fileUpload);
+    return this.authenticationService.register(createAuthDto, file);
   }
 
   @Post('login')
@@ -61,18 +44,26 @@ export class AuthenticationController {
   }
 
   @Get('verify')
-  verifyToken(@Headers('authorization') token: string) {
-    const tokenValue = token.replace('Bearer ', '');
-    return this.authenticationService.verifyToken(tokenValue);
+  verifyToken(@Headers('authorization') authorization?: string) {
+    if (!authorization) {
+      throw new UnauthorizedException('No token provided');
+    }
+
+    const [type, token] = authorization.split(' ');
+    if (type !== 'Bearer' || !token) {
+      throw new UnauthorizedException('Invalid authorization header');
+    }
+
+    return this.authenticationService.verifyToken(token);
   }
 
   @Post('forgot-password')
-  forgotPassword(@Body() body: { email: string }) {
+  forgotPassword(@Body() body: ForgotPasswordDto) {
     return this.authenticationService.forgotPassword(body.email);
   }
 
   @Post('reset-password')
-  resetPassword(@Body() resetPasswordDto: { token: string; password: string }) {
+  resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return this.authenticationService.resetPassword(
       resetPasswordDto.token,
       resetPasswordDto.password,

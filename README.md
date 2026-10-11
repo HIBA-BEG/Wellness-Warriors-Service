@@ -1,99 +1,85 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Wellness Warriors API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS API for the Wellness Warriors portfolio demo. The React client lives in `wellness-warriors-client`.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Setup
 
-## Description
+Requirements: Node.js 20+ and MongoDB.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
-
-## Project setup
-
-```bash
-$ npm install
+```powershell
+cd wellness-warriors-server
+Copy-Item .env.example .env
+npm install
 ```
 
-## Compile and run the project
+Edit `.env` and set `JWT_SECRET` to a long random string. Set `MONGO_URI` to your local MongoDB or MongoDB Atlas connection string. SMTP variables are only needed for password-reset email.
 
-```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+```powershell
+npm run start:dev
 ```
 
-## Run tests
+The API listens on `http://localhost:3000`.
 
-```bash
-# unit tests
-$ npm run test
+## Environment variables
 
-# e2e tests
-$ npm run test:e2e
+| Name | Required | Purpose |
+| --- | --- | --- |
+| `PORT` | no | Port to listen on. Defaults to `3000`. |
+| `MONGO_URI` | yes | MongoDB connection string. |
+| `JWT_SECRET` | yes | Startup fails when this is missing. |
+| `JWT_ACCESS_EXPIRES` | no | Login token lifetime. Defaults to `1h`. |
+| `JWT_RESET_EXPIRES` | no | Password-reset token lifetime. Defaults to `1h`. |
+| `CLIENT_URL` | no | Comma-separated browser origins for CORS. `http://localhost:5173` is always allowed. The first origin is used in reset emails. |
+| `SMTP_HOST` | for email | SMTP server. |
+| `SMTP_PORT` | for email | SMTP port. `465` uses TLS. |
+| `SMTP_USER` | for email | SMTP username. |
+| `SMTP_PASS` | for email | SMTP password. |
+| `SMTP_FROM` | no | Display name on outgoing mail. |
+| `SMTP_ALLOW_INVALID_CERTS` | no | Set to `true` only when the SMTP server uses a certificate you cannot verify. |
 
-# test coverage
-$ npm run test:cov
+Older names still work as fallbacks: `MONGODB_URI`, `APP_EMAIL`, `APP_EMAIL_PASS`, `APP_EMAIL_USERNAME`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`. New deployments should use the names in the table.
+
+## Demo data
+
+```powershell
+npm run seed
 ```
 
-## Deployment
+The command is safe to run more than once. It resets the demo passwords, replaces the event list, and removes participant accounts that are not part of this demo.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+| Account | Password | Role |
+| --- | --- | --- |
+| `organizer@wellnesswarriors.demo` | `OrganizerDemo123!` | organizer |
+| 30 participants, such as `amina.bennani@wellnesswarriors.demo` | `ParticipantDemo123!` | participant |
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+The organizer owns 20 events across Morocco: completed sessions from the past few weeks, scheduled sessions still to come, and two cancellations. Each person has a profile picture and each event has a poster. Image files live in `seed-images/`. The seed copies them into `uploads/` and `uploads-profile/` next to the API process. Those two folders stay out of git because local-disk uploads are ephemeral on free hosting. Public registration always creates a participant. It cannot create an organizer or an admin.
 
-```bash
-$ npm install -g mau
-$ mau deploy
+## Scripts
+
+```powershell
+npm run start:dev
+npm run build
+npm run start:prod
+npm test
+npm run seed
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+## Docker
 
-## Resources
+From the repository root, copy `wellness-warriors-server/.env.example` to `wellness-warriors-server/.env`, set `JWT_SECRET`, then:
 
-Check out a few resources that may come in handy when working with NestJS:
+```powershell
+docker compose up --build
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+Compose starts MongoDB, the API on port 3000, and the client on port 5173. Inside Compose, `MONGO_URI` points at the MongoDB service.
 
-## Support
+## Uploads
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+Profile pictures and event posters are stored on local disk (`uploads` and `uploads-profile`). The database stores a relative path such as `/uploads/<file>.jpg`, and the API turns that into an absolute URL when it responds.
 
-## Stay in touch
+Local-disk uploads are ephemeral on free hosting (including Render's free web service). Files disappear when the instance restarts or is replaced. Use external object storage if uploads must survive a restart.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Render
 
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Set `MONGO_URI`, `JWT_SECRET`, `CLIENT_URL` (your Vercel URL), and `PORT` is provided by Render. Add the SMTP variables if password reset should send mail. The service listens on `0.0.0.0` and `process.env.PORT`.

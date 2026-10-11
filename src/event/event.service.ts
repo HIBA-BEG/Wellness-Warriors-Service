@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,12 +8,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
-import { Event } from './entities/event.entity';
-import { User } from '../user/entities/user.entity';
-import { join, extname } from 'path';
-import { mkdir, writeFile } from 'fs/promises';
-import { v4 as uuidv4 } from 'uuid';
+import { Event, EventStatus } from './entities/event.entity';
+import { User, UserRole } from '../user/entities/user.entity';
 import { FileUpload } from '../types/file-upload.interface';
+import { savePublicImage } from '../common/image-upload';
+import { storedAssetPath } from '../common/asset-url';
+import { AuthActor } from '../user/user.service';
+
+const PUBLIC_USER_FIELDS =
+  'firstName lastName email profilePicture role gender';
 
 @Injectable()
 export class EventService {
@@ -25,109 +29,75 @@ export class EventService {
     createEventDto: CreateEventDto,
     file: FileUpload,
   ): Promise<Event> {
-    try {
-      if (!file.buffer || file.buffer.length === 0) {
-        throw new Error('Invalid file buffer');
-      }
+    const poster = await this.uploadEventImage(file);
+    const createdEvent = new this.eventModel({
+      ...createEventDto,
+      poster,
+    });
+    const event = await createdEvent.save();
 
-      const imageUrl = await this.uploadEventImage(file);
+    await this.userModel.findByIdAndUpdate(event.organizer, {
+      $push: { createdEvents: event._id },
+    });
 
-      const eventData = {
-        ...createEventDto,
-        poster: imageUrl,
-      };
-      const createdEvent = new this.eventModel(eventData);
-      const event = await createdEvent.save();
+    await this.userModel.updateMany(
+      { _id: { $in: event.participants } },
+      { $push: { attendingEvents: event._id } },
+    );
 
-      await this.userModel.findByIdAndUpdate(event.organizer, {
-        $push: { createdEvents: event._id },
-      });
-
-      await this.userModel.updateMany(
-        { _id: { $in: event.participants } },
-        { $push: { attendingEvents: event._id } },
-      );
-
-      return event;
-    } catch (error) {
-      // console.error('Service error details:', {
-      //   message: error.message,
-      //   name: error.name
-      // });
-      throw new BadRequestException(`Failed to create event: ${error.message}`);
-    }
+    return event;
   }
 
   async uploadEventImage(file: FileUpload): Promise<string> {
-    try {
-      const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif'];
-      if (!allowedMimeTypes.includes(file.mimetype)) {
-        throw new BadRequestException(
-          'Invalid file type. Only JPEG, PNG, and GIF are allowed.',
-        );
-      }
-
-      const uploadDir = join(process.cwd(), 'uploads');
-      try {
-        await mkdir(uploadDir, { recursive: true });
-      } catch (err) {
-        if (err.code !== 'EEXIST') throw err;
-      }
-      // console.log('Service: Upload directory verified:', uploadDir);
-
-      const fileExt = extname(file.originalname || '.jpg');
-      const fileName = `${uuidv4()}${fileExt}`;
-      const filePath = join(uploadDir, fileName);
-
-      // console.log('Service: Writing file:', {
-      //   path: filePath,
-      //   size: file.buffer.length
-      // });
-
-      await writeFile(filePath, file.buffer);
-      console.log('Service: File written successfully:', filePath);
-      const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-      return `${serverUrl}/uploads/${fileName}`;
-    } catch (error) {
-      // console.error('Upload error details:', {
-      //   message: error.message,
-      //   stack: error.stack,
-      //   name: error.name
-      // });
-      throw new Error(`Failed to upload image: ${error.message}`);
-    }
+    return savePublicImage(file, 'uploads');
   }
 
   async findAll(): Promise<Event[]> {
     return this.eventModel
       .find({ isDeleted: false })
-      .populate('organizer')
-      .populate('participants')
+      .populate({ path: 'organizer', select: PUBLIC_USER_FIELDS })
+      .populate({ path: 'participants', select: PUBLIC_USER_FIELDS })
       .exec();
   }
 
   async findOne(id: string): Promise<Event> {
     const event = await this.eventModel
       .findById(id)
-      .populate('organizer')
-      .populate('participants')
+      .populate({ path: 'organizer', select: PUBLIC_USER_FIELDS })
+      .populate({ path: 'participants', select: PUBLIC_USER_FIELDS })
       .exec();
 
-    if (!event) {
-      throw new NotFoundException(`Event not found`);
+    if (!event || event.isDeleted) {
+      throw new NotFoundException('Event not found');
     }
     return event;
   }
 
-  async update(id: string, updateEventDto: UpdateEventDto): Promise<Event> {
+  async update(
+    id: string,
+    updateEventDto: UpdateEventDto,
+    actor: AuthActor,
+  ): Promise<Event> {
+    const existing = await this.eventModel.findById(id).exec();
+    if (!existing || existing.isDeleted) {
+      throw new NotFoundException('Event not found');
+    }
+
+    this.assertCanManage(existing, actor);
+
+    const changes = { ...updateEventDto };
+    delete changes.organizer;
+    if (changes.poster) {
+      changes.poster = storedAssetPath(changes.poster);
+    }
     const updatedEvent = await this.eventModel
-      .findByIdAndUpdate(id, updateEventDto, { new: true })
-      .populate('organizer')
-      .populate('participants')
+      .findByIdAndUpdate(id, changes, { new: true })
+      .populate({ path: 'organizer', select: PUBLIC_USER_FIELDS })
+      .populate({ path: 'participants', select: PUBLIC_USER_FIELDS })
       .exec();
 
     if (!updatedEvent) {
-      throw new NotFoundException(`Event not found`);
+      throw new NotFoundException('Event not found');
     }
 
     await this.userModel.findByIdAndUpdate(updatedEvent.organizer, {
@@ -147,13 +117,97 @@ export class EventService {
     return updatedEvent;
   }
 
-  async remove(id: string): Promise<{ message: string }> {
-    const result = await this.eventModel
-      .findByIdAndUpdate(id, { isDeleted: true })
-      .exec();
-    if (!result) {
-      throw new NotFoundException(`Event not found`);
+  async join(id: string, actor: AuthActor): Promise<Event> {
+    const event = await this.findActiveEvent(id);
+    this.assertCanAttend(event, actor);
+
+    if (event.status !== EventStatus.SCHEDULED || event.endDate <= new Date()) {
+      throw new BadRequestException('This event is not open for registration');
     }
+
+    await this.eventModel.findByIdAndUpdate(id, {
+      $addToSet: { participants: actor.id },
+    });
+    await this.userModel.findByIdAndUpdate(actor.id, {
+      $addToSet: { attendingEvents: event._id },
+    });
+
+    return this.findOne(id);
+  }
+
+  async leave(id: string, actor: AuthActor): Promise<Event> {
+    const event = await this.findActiveEvent(id);
+
+    if (actor.role !== UserRole.PARTICIPANT) {
+      throw new ForbiddenException('Only participants can change attendance');
+    }
+
+    if (event.status === EventStatus.COMPLETED) {
+      throw new BadRequestException(
+        'Attendance for a completed event stays on record',
+      );
+    }
+
+    await this.eventModel.findByIdAndUpdate(id, {
+      $pull: { participants: actor.id },
+    });
+    await this.userModel.findByIdAndUpdate(actor.id, {
+      $pull: { attendingEvents: event._id },
+    });
+
+    return this.findOne(id);
+  }
+
+  async remove(id: string, actor: AuthActor): Promise<{ message: string }> {
+    const existing = await this.eventModel.findById(id).exec();
+    if (!existing || existing.isDeleted) {
+      throw new NotFoundException('Event not found');
+    }
+
+    this.assertCanManage(existing, actor);
+
+    await this.eventModel.findByIdAndUpdate(id, { isDeleted: true }).exec();
+
     return { message: 'Event deleted successfully' };
+  }
+
+  private async findActiveEvent(id: string): Promise<Event> {
+    const event = await this.eventModel.findById(id).exec();
+    if (!event || event.isDeleted) {
+      throw new NotFoundException('Event not found');
+    }
+    return event;
+  }
+
+  private assertCanAttend(event: Event, actor: AuthActor) {
+    if (actor.role !== UserRole.PARTICIPANT) {
+      throw new ForbiddenException('Only participants can join an event');
+    }
+
+    if (this.organizerId(event) === String(actor.id)) {
+      throw new BadRequestException('The organizer is already hosting this event');
+    }
+  }
+
+  private organizerId(event: Event) {
+    const organizer = event.organizer as unknown as {
+      _id?: { toString(): string };
+      toString(): string;
+    };
+    return organizer?._id ? organizer._id.toString() : organizer?.toString();
+  }
+
+  private assertCanManage(event: Event, actor: AuthActor) {
+    if (actor.role === UserRole.ADMIN) {
+      return;
+    }
+
+    if (this.organizerId(event) === String(actor.id)) {
+      return;
+    }
+
+    throw new ForbiddenException(
+      'Only the event organizer or an admin can modify this event',
+    );
   }
 }
