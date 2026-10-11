@@ -38,7 +38,14 @@ import { AssetUrlInterceptor } from './common/asset-url.interceptor';
         if (!uri) {
           throw new Error('MONGO_URI is required');
         }
-        return { uri };
+        // Serverless-friendly: small pool, fail fast instead of hanging.
+        return {
+          uri,
+          serverSelectionTimeoutMS: 10000,
+          ...(process.env.VERCEL
+            ? { maxPoolSize: 5, retryAttempts: 1, retryDelay: 1000 }
+            : {}),
+        };
       },
     }),
     MailerModule.forRootAsync({

@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { mkdir, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
+import { uploadRoot } from './upload-root';
 import { v4 as uuidv4 } from 'uuid';
 import { FileUpload } from '../types/file-upload.interface';
 
@@ -41,7 +42,7 @@ export async function savePublicImage(
     );
   }
 
-  const uploadDir = join(process.cwd(), folder);
+  const uploadDir = uploadRoot(folder);
   await mkdir(uploadDir, { recursive: true });
 
   const fileName = `${uuidv4()}${extension}`;
