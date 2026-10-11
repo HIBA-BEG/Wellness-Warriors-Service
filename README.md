@@ -44,6 +44,12 @@ Older names still work as fallbacks: `MONGODB_URI`, `APP_EMAIL`, `APP_EMAIL_PASS
 ```powershell
 npm run seed
 ```
+MONGODB_URI=mongodb://localhost:27017/WellnessWarriors
+JWT_SECRET=your_jwt_secret_key
+PORT=3000
+```
+
+## 🖥 Available Scripts
 
 The command is safe to run more than once. It resets the demo passwords, replaces the event list, and removes participant accounts that are not part of this demo.
 
